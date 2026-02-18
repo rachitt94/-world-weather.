@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Weather & AQI Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #0f172a;
+            color: white;
+            transition: all 0.5s ease;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px border rgba(255, 255, 255, 0.1);
+        }
+
+        .weather-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background-size: cover;
+            background-position: center;
+            filter: brightness(0.4);
+            transition: background-image 1s ease-in-out;
+        }
+
+        .aqi-1 { color: #4ade80; } /* Good */
+        .aqi-2 { color: #facc15; } /* Fair */
+        .aqi-3 { color: #fb923c; } /* Moderate */
+        .aqi-4 { color: #f87171; } /* Poor */
+        .aqi-5 { color: #ef4444; } /* Very Poor */
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
+    <div id="bg-overlay" class="weather-bg" style="background-image: url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=2000');"></div>
+
+    <!-- Header Section -->
+    <header class="w-full max-w-4xl mb-8 text-center animate-fade">
+        <h1 class="text-4xl md:text-5xl font-bold mb-2 tracking-tight">Weather <span class="text-blue-400">& AQI</span> Explorer</h1>
+        <p class="text-gray-300">Check climate conditions for any country or city globally.</p>
+    </header>
+
+    <!-- Search Section -->
+    <div class="w-full max-w-xl mb-10 animate-fade" style="animation-delay: 0.1s;">
+        <div class="relative group">
+            <input type="text" id="cityInput" placeholder="Enter city or country name..." 
+                class="w-full px-6 py-4 rounded-2xl glass border-none focus:ring-2 focus:ring-blue-500 outline-none text-lg transition-all pr-16">
+            <button onclick="getWeatherData()" id="searchBtn" class="absolute right-2 top-2 bottom-2 bg-blue-600 hover:bg-blue-500 text-white px-6 rounded-xl transition-all flex items-center justify-center">
+                <i class="fas fa-search"></i>
+            </button>
+        </div>
+        <div id="error-msg" class="hidden mt-3 text-red-400 text-sm px-4 bg-red-400/10 py-2 rounded-lg text-center"></div>
+    </div>
+
+    <!-- Results Display -->
+    <main id="weatherInfo" class="hidden w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade" style="animation-delay: 0.2s;">
+        
+        <!-- Primary Card (Temperature & Main Climate) -->
+        <div class="md:col-span-2 glass p-8 rounded-3xl flex flex-col justify-between">
+            <div class="flex justify-between items-start mb-8">
+                <div>
+                    <h2 id="cityName" class="text-4xl font-bold mb-1">---</h2>
+                    <p id="localTime" class="text-blue-300 font-medium"></p>
+                    <p id="weatherDesc" class="capitalize text-gray-300 text-lg mt-1">---</p>
+                </div>
+                <img id="weatherIcon" src="" alt="icon" class="w-24 h-24 -mt-4">
+            </div>
+
+            <div class="flex items-end gap-4 mb-8">
+                <span id="temp" class="text-8xl font-bold">--°</span>
+                <div class="mb-4">
+                    <p class="text-gray-400 uppercase text-xs font-bold tracking-widest">Feels Like</p>
+                    <p id="feelsLike" class="text-2xl font-semibold">--°C</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-white/10 pt-6">
+                <div class="text-center md:text-left">
+                    <p class="text-gray-400 text-xs mb-1"><i class="fas fa-droplet mr-1"></i> Humidity</p>
+                    <p id="humidity" class="text-xl font-bold">--%</p>
+                </div>
+                <div class="text-center md:text-left">
+                    <p class="text-gray-400 text-xs mb-1"><i class="fas fa-wind mr-1"></i> Wind Speed</p>
+                    <p id="windSpeed" class="text-xl font-bold">-- km/h</p>
+                </div>
+                <div class="text-center md:text-left">
+                    <p class="text-gray-400 text-xs mb-1"><i class="fas fa-compress-arrows-alt mr-1"></i> Pressure</p>
+                    <p id="pressure" class="text-xl font-bold">-- hPa</p>
+                </div>
+                <div class="text-center md:text-left">
+                    <p class="text-gray-400 text-xs mb-1"><i class="fas fa-eye mr-1"></i> Visibility</p>
+                    <p id="visibility" class="text-xl font-bold">-- km</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Air Quality Card -->
+        <div class="glass p-8 rounded-3xl flex flex-col">
+            <h3 class="text-xl font-bold mb-6 flex items-center">
+                <i class="fas fa-lungs mr-3 text-blue-400"></i> Air Quality Index
+            </h3>
+            
+            <div id="aqiCircle" class="w-32 h-32 rounded-full border-8 border-white/5 flex items-center justify-center mx-auto mb-6 relative">
+                <div class="text-center">
+                    <span id="aqiValue" class="text-4xl font-bold block leading-none">--</span>
+                    <span class="text-[10px] text-gray-400 uppercase font-bold">Index</span>
+                </div>
+            </div>
+
+            <div class="text-center mb-8">
+                <p id="aqiStatus" class="text-2xl font-bold mb-1">---</p>
+                <p id="aqiMessage" class="text-sm text-gray-400">Loading air data...</p>
+            </div>
+
+            <div class="space-y-3 mt-auto border-t border-white/10 pt-6">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">PM2.5</span>
+                    <span id="pm25" class="font-bold">--</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">PM10</span>
+                    <span id="pm10" class="font-bold">--</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">CO</span>
+                    <span id="co" class="font-bold">--</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">NO₂</span>
+                    <span id="no2" class="font-bold">--</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Placeholder/Instructions -->
+    <div id="placeholder" class="mt-20 text-center opacity-40 max-w-md mx-auto animate-fade">
+        <i class="fas fa-cloud-sun text-6xl mb-4"></i>
+        <h2 class="text-xl font-semibold">Ready to Explore</h2>
+        <p class="text-sm mt-2">Enter any location above to get real-time weather and air pollution metrics.</p>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-auto py-8 text-gray-500 text-xs tracking-widest uppercase">
+        Built with OpenWeatherMap API & Tailwind CSS
+    </footer>
+
+    <script>
+        // API Configuration (Note: Free keys have limited requests)
+        const apiKey = "93e985f47c11e67207d5102a8f82f0f0"; // Public OpenWeather Key (Sample)
+        
+        const cityInput = document.getElementById('cityInput');
+        const weatherInfo = document.getElementById('weatherInfo');
+        const placeholder = document.getElementById('placeholder');
+        const errorMsg = document.getElementById('error-msg');
+
+        // Allow 'Enter' key search
+        cityInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') getWeatherData();
+        });
+
+        async function getWeatherData() {
+            const city = cityInput.value.trim();
+            if (!city) return;
+
+            showLoading(true);
+
+            try {
+                // 1. Fetch Current Weather
+                const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`);
+                if (!weatherRes.ok) throw new Error('Location not found');
+                const weatherData = await weatherRes.json();
+
+                // 2. Fetch AQI (Air Quality Index) using coords from weather data
+                const aqiRes = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${weatherData.coord.lat}&lon=${weatherData.coord.lon}&appid=${apiKey}`);
+                const aqiData = await aqiRes.json();
+
+                updateUI(weatherData, aqiData.list[0]);
+                updateBackground(weatherData.weather[0].main);
+                
+                placeholder.classList.add('hidden');
+                weatherInfo.classList.remove('hidden');
+                errorMsg.classList.add('hidden');
+            } catch (err) {
+                errorMsg.innerText = err.message;
+                errorMsg.classList.remove('hidden');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function updateUI(weather, pollution) {
+            // Update Text Data
+            document.getElementById('cityName').innerText = `${weather.name}, ${weather.sys.country}`;
+            document.getElementById('temp').innerText = `${Math.round(weather.main.temp)}°`;
+            document.getElementById('feelsLike').innerText = `${Math.round(weather.main.feels_like)}°C`;
+            document.getElementById('weatherDesc').innerText = weather.weather[0].description;
+            document.getElementById('humidity').innerText = `${weather.main.humidity}%`;
+            document.getElementById('windSpeed').innerText = `${(weather.wind.speed * 3.6).toFixed(1)} km/h`;
+            document.getElementById('pressure').innerText = `${weather.main.pressure} hPa`;
+            document.getElementById('visibility').innerText = `${(weather.visibility / 1000).toFixed(1)} km`;
+
+            // Time & Date
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+            document.getElementById('localTime').innerText = dateStr;
+
+            // Weather Icon
+            const iconCode = weather.weather[0].icon;
+            document.getElementById('weatherIcon').src = `https://openweathermap.org/img/wn/${iconCode}@4x.png`;
+
+            // AQI Logic (1-5 scale from OpenWeather)
+            const aqiVal = pollution.main.aqi;
+            const aqiStatusMap = {
+                1: { label: "Good", msg: "Air quality is considered satisfactory.", class: "aqi-1" },
+                2: { label: "Fair", msg: "Acceptable air quality for most.", class: "aqi-2" },
+                3: { label: "Moderate", msg: "Sensitive groups may be affected.", class: "aqi-3" },
+                4: { label: "Poor", msg: "Health impacts may be experienced.", class: "aqi-4" },
+                5: { label: "Very Poor", msg: "Emergency health warning level.", class: "aqi-5" }
+            };
+
+            const aqiInfo = aqiStatusMap[aqiVal];
+            const aqiDisplay = document.getElementById('aqiValue');
+            const aqiStatus = document.getElementById('aqiStatus');
+            const aqiCircle = document.getElementById('aqiCircle');
+
+            aqiDisplay.innerText = aqiVal;
+            aqiStatus.innerText = aqiInfo.label;
+            document.getElementById('aqiMessage').innerText = aqiInfo.msg;
+            
+            // Apply colors
+            aqiDisplay.className = `text-4xl font-bold block leading-none ${aqiInfo.class}`;
+            aqiStatus.className = `text-2xl font-bold mb-1 ${aqiInfo.class}`;
+            aqiCircle.style.borderColor = getComputedStyle(document.querySelector(`.${aqiInfo.class}`)).color;
+
+            // Pollutants
+            document.getElementById('pm25').innerText = `${pollution.components.pm2_5.toFixed(1)} μg/m³`;
+            document.getElementById('pm10').innerText = `${pollution.components.pm10.toFixed(1)} μg/m³`;
+            document.getElementById('co').innerText = `${pollution.components.co.toFixed(1)} μg/m³`;
+            document.getElementById('no2').innerText = `${pollution.components.no2.toFixed(1)} μg/m³`;
+        }
+
+        function updateBackground(condition) {
+            const overlay = document.getElementById('bg-overlay');
+            const cond = condition.toLowerCase();
+            
+            const bgs = {
+                clear: "https://images.unsplash.com/photo-1601297183305-6df142704ea2?auto=format&fit=crop&q=80&w=2000",
+                clouds: "https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&q=80&w=2000",
+                rain: "https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?auto=format&fit=crop&q=80&w=2000",
+                drizzle: "https://images.unsplash.com/photo-1541339907198-e08756edd811?auto=format&fit=crop&q=80&w=2000",
+                thunderstorm: "https://images.unsplash.com/photo-1605727282302-1a958d7b438b?auto=format&fit=crop&q=80&w=2000",
+                snow: "https://images.unsplash.com/photo-1478265409131-1f65c88f965c?auto=format&fit=crop&q=80&w=2000",
+                mist: "https://images.unsplash.com/photo-1543968996-ee822b8176ba?auto=format&fit=crop&q=80&w=2000",
+                haze: "https://images.unsplash.com/photo-1533753934147-52736b6b3b22?auto=format&fit=crop&q=80&w=2000",
+                default: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=2000"
+            };
+
+            overlay.style.backgroundImage = `url('${bgs[cond] || bgs.default}')`;
+        }
+
+        function showLoading(isLoading) {
+            const btn = document.getElementById('searchBtn');
+            if (isLoading) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                btn.disabled = true;
+            } else {
+                btn.innerHTML = '<i class="fas fa-search"></i>';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
